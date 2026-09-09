@@ -1,0 +1,100 @@
+name: Release Custom Kpro Sub2API
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v0.2.4)'
+        required: true
+        default: 'v0.2.4'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9 --activate
+
+      - name: Build Frontend
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          check-latest: true
+
+      - name: Build Backend Binaries
+        working-directory: backend
+        run: |
+          VERSION="${{ github.ref_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.tag_name }}"
+          fi
+          mkdir -p ../dist/linux_arm64 ../dist/linux_amd64
+
+          echo "Building linux/arm64..."
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build \
+            -tags embed \
+            -ldflags="-s -w -X main.Version=${VERSION} -X main.Commit=${{ github.sha }} -X main.BuildType=release" \
+            -trimpath \
+            -o ../dist/linux_arm64/sub2api \
+            ./cmd/server
+
+          echo "Building linux/amd64..."
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+            -tags embed \
+            -ldflags="-s -w -X main.Version=${VERSION} -X main.Commit=${{ github.sha }} -X main.BuildType=release" \
+            -trimpath \
+            -o ../dist/linux_amd64/sub2api \
+            ./cmd/server
+
+      - name: Package Archives and Checksums
+        working-directory: dist
+        run: |
+          tar -czf sub2api_linux_arm64.tar.gz -C linux_arm64 sub2api
+          tar -czf sub2api_linux_amd64.tar.gz -C linux_amd64 sub2api
+          sha256sum sub2api_linux_*.tar.gz > checksums.txt
+          ls -lh
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name != '' && github.ref_name || github.event.inputs.tag_name }}
+          name: Sub2API ${{ github.ref_name != '' && github.ref_name || github.event.inputs.tag_name }} (Kpro Custom)
+          body: |
+            ### Kpro Custom Release
+            - Base Upstream Version: ${{ github.ref_name != '' && github.ref_name || github.event.inputs.tag_name }}
+            - Features Included:
+              - 账号文件夹归类管理 (Account Folders)
+              - 每日签到系统 (Daily Check-in 0.20 USD)
+              - 全站 IP / CIDR 黑名单安全拦截 (IP Blacklist)
+              - Glass Auth 毛玻璃全套鉴权界面与移动端防白边适配
+              - Kpro 专属品牌导航与国际化适配
+          files: |
+            dist/sub2api_linux_arm64.tar.gz
+            dist/sub2api_linux_amd64.tar.gz
+            dist/checksums.txt
+          draft: false
+          prerelease: false
