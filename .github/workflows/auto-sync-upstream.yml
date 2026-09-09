@@ -75,7 +75,7 @@ jobs:
         if: steps.check_version.outputs.has_update == 'true'
         working-directory: backend
         run: |
-          VERSION="${{ steps.check_version.outputs.new_tag }}"
+          RAW_VERSION="${{ steps.check_version.outputs.new_tag }}"; VERSION="${RAW_VERSION#v}"
           mkdir -p ../dist/linux_arm64 ../dist/linux_amd64
 
           echo "Building linux/arm64..."

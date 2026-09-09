@@ -48,7 +48,7 @@ jobs:
       - name: Build Backend Binaries
         working-directory: backend
         run: |
-          VERSION="${{ github.ref_name }}"
+          RAW_VERSION="${{ github.ref_name }}"; VERSION="${RAW_VERSION#v}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.tag_name }}"
           fi
