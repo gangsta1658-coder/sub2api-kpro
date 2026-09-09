@@ -17,10 +17,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check Latest Versions
+      - name: Check Latest Versions & Fetch Release Notes
         id: check_version
         run: |
-          UPSTREAM_TAG=$(curl -s https://api.github.com/repos/Wei-Shaw/sub2api/releases/latest | jq -r .tag_name)
+          UPSTREAM_DATA=$(curl -s https://api.github.com/repos/Wei-Shaw/sub2api/releases/latest)
+          UPSTREAM_TAG=$(echo "$UPSTREAM_DATA" | jq -r .tag_name)
+          UPSTREAM_NAME=$(echo "$UPSTREAM_DATA" | jq -r .name)
+          echo "$UPSTREAM_DATA" | jq -r .body > upstream_notes.md
+
           CURRENT_TAG=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
           echo "Upstream latest tag: $UPSTREAM_TAG"
           echo "Current latest tag:  $CURRENT_TAG"
@@ -38,6 +42,7 @@ jobs:
             echo "New upstream version detected: $UPSTREAM_TAG (current: $CURRENT_TAG)"
             echo "has_update=true" >> $GITHUB_OUTPUT
             echo "new_tag=$UPSTREAM_TAG" >> $GITHUB_OUTPUT
+            echo "new_name=$UPSTREAM_NAME" >> $GITHUB_OUTPUT
           fi
 
       - name: Setup Node.js
@@ -97,21 +102,32 @@ jobs:
           tar -czf sub2api_linux_amd64.tar.gz -C linux_amd64 sub2api
           sha256sum sub2api_linux_*.tar.gz > checksums.txt
 
+      - name: Assemble Release Notes
+        if: steps.check_version.outputs.has_update == 'true'
+        run: |
+          cat << 'EOF' > release_body.md
+          ### 👑 Kpro 定制功能保留说明
+          本版本已自动集成 Kpro 专属定制层：
+          - 📁 账号文件夹归类管理 (Account Folders)
+          - 🎁 每日签到系统 (Daily Check-in 0.20 USD 原子奖励 & 签到日历)
+          - 🛡️ 全站 IP / CIDR 黑名单安全拦截 (IP Blacklist)
+          - 🔮 Glass Auth 毛玻璃全套鉴权界面与移动端防白边适配
+          - 🌐 Kpro 专属品牌导航与国际化适配
+
+          ---
+
+          ### 📦 官方更新与修复日志 (Upstream Release Notes)
+
+          EOF
+          cat upstream_notes.md >> release_body.md
+
       - name: Publish GitHub Release
         if: steps.check_version.outputs.has_update == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.check_version.outputs.new_tag }}
           name: Sub2API ${{ steps.check_version.outputs.new_tag }} (Kpro Custom)
-          body: |
-            ### Kpro Custom Auto-Release
-            - Synced from Upstream: ${{ steps.check_version.outputs.new_tag }}
-            - Features Included:
-              - 账号文件夹归类管理 (Account Folders)
-              - 每日签到系统 (Daily Check-in 0.20 USD)
-              - 全站 IP / CIDR 黑名单安全拦截 (IP Blacklist)
-              - Glass Auth 毛玻璃全套鉴权界面与移动端防白边适配
-              - Kpro 专属品牌导航与国际化适配
+          body_path: release_body.md
           files: |
             dist/sub2api_linux_arm64.tar.gz
             dist/sub2api_linux_amd64.tar.gz
