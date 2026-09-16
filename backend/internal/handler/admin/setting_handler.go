@@ -385,6 +385,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		DailyCheckInEnabled:            settings.DailyCheckInEnabled,
 
 		AvailableChannelsEnabled: settings.AvailableChannelsEnabled,
+		SubscriptionEnabled:      settings.SubscriptionEnabled,
 
 		ModelPlazaEnabled:       settings.ModelPlazaEnabled,
 		ModelPlazaRequireAuth:   settings.ModelPlazaRequireAuth,
