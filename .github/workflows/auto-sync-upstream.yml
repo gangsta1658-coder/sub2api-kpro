@@ -24,7 +24,11 @@ jobs:
           UPSTREAM_DATA=$(curl -s https://api.github.com/repos/Wei-Shaw/sub2api/releases/latest)
           UPSTREAM_TAG=$(echo "$UPSTREAM_DATA" | jq -r .tag_name)
           UPSTREAM_NAME=$(echo "$UPSTREAM_DATA" | jq -r .name)
-          echo "$UPSTREAM_DATA" | jq -r .body > upstream_notes.md
+          UPSTREAM_BODY=$(curl -s "https://api.github.com/repos/Wei-Shaw/sub2api/releases/tags/$UPSTREAM_TAG" | jq -r '.body // empty')
+          if [ -z "$UPSTREAM_BODY" ] || [ "$UPSTREAM_BODY" = "null" ]; then
+            UPSTREAM_BODY=$(echo "$UPSTREAM_DATA" | jq -r '.body // empty')
+          fi
+          echo "$UPSTREAM_BODY" > upstream_notes.md
 
           CURRENT_TAG=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
           echo "Upstream latest tag: $UPSTREAM_TAG"
@@ -127,6 +131,9 @@ jobs:
       - name: Assemble Release Notes
         if: steps.check_version.outputs.has_update == 'true'
         run: |
+          UPSTREAM_TAG="${{ steps.check_version.outputs.new_tag }}"
+          UPSTREAM_BODY=$(curl -s "https://api.github.com/repos/Wei-Shaw/sub2api/releases/tags/$UPSTREAM_TAG" | jq -r '.body // empty')
+
           cat << 'INNER_EOF' > release_body.md
           ### 👑 Kpro 定制功能保留说明
           本版本已自动集成 Kpro 专属定制层：
@@ -141,7 +148,11 @@ jobs:
           ### 📦 官方更新与修复日志 (Upstream Release Notes)
 
           INNER_EOF
-          cat upstream_notes.md >> release_body.md
+          if [ -n "$UPSTREAM_BODY" ] && [ "$UPSTREAM_BODY" != "null" ]; then
+            echo "$UPSTREAM_BODY" >> release_body.md
+          elif [ -f upstream_notes.md ] && [ -s upstream_notes.md ]; then
+            cat upstream_notes.md >> release_body.md
+          fi
 
       - name: Publish GitHub Release
         if: steps.check_version.outputs.has_update == 'true'

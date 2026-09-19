@@ -84,19 +84,38 @@ jobs:
           sha256sum sub2api_*.tar.gz > checksums.txt
           ls -lh
 
+      - name: Assemble Release Notes
+        run: |
+          RAW_VERSION="${{ github.ref_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RAW_VERSION="${{ github.event.inputs.tag_name }}"
+          fi
+          UPSTREAM_BODY=$(curl -s "https://api.github.com/repos/Wei-Shaw/sub2api/releases/tags/${RAW_VERSION}" | jq -r '.body // empty')
+
+          cat << 'INNER_EOF' > release_body.md
+          ### 👑 Kpro 定制功能保留说明
+          本版本已自动集成 Kpro 专属定制层：
+          - 📁 账号文件夹归类管理 (Account Folders)
+          - 🎁 每日签到系统 (Daily Check-in 0.20 USD 原子奖励 & 签到日历)
+          - 🛡️ 全站 IP / CIDR 黑名单安全拦截 (IP Blacklist)
+          - 🔮 Glass Auth 毛玻璃全套鉴权界面与移动端防白边适配
+          - 🌐 Kpro 专属品牌导航与国际化适配
+
+          ---
+
+          ### 📦 官方更新与修复日志 (Upstream Release Notes)
+
+          INNER_EOF
+          if [ -n "$UPSTREAM_BODY" ] && [ "$UPSTREAM_BODY" != "null" ]; then
+            echo "$UPSTREAM_BODY" >> release_body.md
+          fi
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name != '' && github.ref_name || github.event.inputs.tag_name }}
           name: Sub2API ${{ github.ref_name != '' && github.ref_name || github.event.inputs.tag_name }} (Kpro Custom)
-          body: |
-            ### 👑 Kpro 定制功能保留说明
-            本版本已自动集成 Kpro 专属定制层：
-            - 📁 账号文件夹归类管理 (Account Folders)
-            - 🎁 每日签到系统 (Daily Check-in 0.20 USD 原子奖励 & 签到日历)
-            - 🛡️ 全站 IP / CIDR 黑名单安全拦截 (IP Blacklist)
-            - 🔮 Glass Auth 毛玻璃全套鉴权界面与移动端防白边适配
-            - 🌐 Kpro 专属品牌导航与国际化适配
+          body_path: release_body.md
           files: |
             dist/*.tar.gz
             dist/checksums.txt
