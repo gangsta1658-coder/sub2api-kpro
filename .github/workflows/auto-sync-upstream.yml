@@ -122,6 +122,7 @@ jobs:
           cp sub2api_linux_arm64.tar.gz "sub2api_${VERSION}_linux_arm64.tar.gz"
           cp sub2api_linux_amd64.tar.gz "sub2api_${VERSION}_linux_amd64.tar.gz"
           sha256sum sub2api_*.tar.gz > checksums.txt
+          ls -lh
 
       - name: Assemble Release Notes
         if: steps.check_version.outputs.has_update == 'true'
@@ -150,10 +151,7 @@ jobs:
           name: Sub2API ${{ steps.check_version.outputs.new_tag }} (Kpro Custom)
           body_path: release_body.md
           files: |
-            dist/sub2api_linux_arm64.tar.gz
-            dist/sub2api_linux_amd64.tar.gz
-            dist/sub2api_*_linux_arm64.tar.gz
-            dist/sub2api_*_linux_amd64.tar.gz
+            dist/*.tar.gz
             dist/checksums.txt
           draft: false
           prerelease: false

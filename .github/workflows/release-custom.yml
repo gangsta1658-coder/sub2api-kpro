@@ -98,10 +98,7 @@ jobs:
             - 🔮 Glass Auth 毛玻璃全套鉴权界面与移动端防白边适配
             - 🌐 Kpro 专属品牌导航与国际化适配
           files: |
-            dist/sub2api_linux_arm64.tar.gz
-            dist/sub2api_linux_amd64.tar.gz
-            dist/sub2api_*_linux_arm64.tar.gz
-            dist/sub2api_*_linux_amd64.tar.gz
+            dist/*.tar.gz
             dist/checksums.txt
           draft: false
           prerelease: false
