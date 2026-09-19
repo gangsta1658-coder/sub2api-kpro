@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag (e.g. v0.2.4)'
+        description: 'Release Tag (e.g. v0.2.7)'
         required: true
-        default: 'v0.2.4'
+        default: 'v0.2.7'
 
 jobs:
   build-and-release:
@@ -42,15 +42,15 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
-          check-latest: true
+          go-version-file: backend/go.mod
+          check-latest: false
 
       - name: Build Backend Binaries
         working-directory: backend
         run: |
           RAW_VERSION="${{ github.ref_name }}"; VERSION="${RAW_VERSION#v}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.tag_name }}"
+            RAW_VERSION="${{ github.event.inputs.tag_name }}"; VERSION="${RAW_VERSION#v}"
           fi
           mkdir -p ../dist/linux_arm64 ../dist/linux_amd64
 
@@ -73,9 +73,15 @@ jobs:
       - name: Package Archives and Checksums
         working-directory: dist
         run: |
+          RAW_VERSION="${{ github.ref_name }}"; VERSION="${RAW_VERSION#v}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RAW_VERSION="${{ github.event.inputs.tag_name }}"; VERSION="${RAW_VERSION#v}"
+          fi
           tar -czf sub2api_linux_arm64.tar.gz -C linux_arm64 sub2api
           tar -czf sub2api_linux_amd64.tar.gz -C linux_amd64 sub2api
-          sha256sum sub2api_linux_*.tar.gz > checksums.txt
+          cp sub2api_linux_arm64.tar.gz "sub2api_${VERSION}_linux_arm64.tar.gz"
+          cp sub2api_linux_amd64.tar.gz "sub2api_${VERSION}_linux_amd64.tar.gz"
+          sha256sum sub2api_*.tar.gz > checksums.txt
           ls -lh
 
       - name: Publish GitHub Release
@@ -84,17 +90,18 @@ jobs:
           tag_name: ${{ github.ref_name != '' && github.ref_name || github.event.inputs.tag_name }}
           name: Sub2API ${{ github.ref_name != '' && github.ref_name || github.event.inputs.tag_name }} (Kpro Custom)
           body: |
-            ### Kpro Custom Release
-            - Base Upstream Version: ${{ github.ref_name != '' && github.ref_name || github.event.inputs.tag_name }}
-            - Features Included:
-              - 账号文件夹归类管理 (Account Folders)
-              - 每日签到系统 (Daily Check-in 0.20 USD)
-              - 全站 IP / CIDR 黑名单安全拦截 (IP Blacklist)
-              - Glass Auth 毛玻璃全套鉴权界面与移动端防白边适配
-              - Kpro 专属品牌导航与国际化适配
+            ### 👑 Kpro 定制功能保留说明
+            本版本已自动集成 Kpro 专属定制层：
+            - 📁 账号文件夹归类管理 (Account Folders)
+            - 🎁 每日签到系统 (Daily Check-in 0.20 USD 原子奖励 & 签到日历)
+            - 🛡️ 全站 IP / CIDR 黑名单安全拦截 (IP Blacklist)
+            - 🔮 Glass Auth 毛玻璃全套鉴权界面与移动端防白边适配
+            - 🌐 Kpro 专属品牌导航与国际化适配
           files: |
             dist/sub2api_linux_arm64.tar.gz
             dist/sub2api_linux_amd64.tar.gz
+            dist/sub2api_*_linux_arm64.tar.gz
+            dist/sub2api_*_linux_amd64.tar.gz
             dist/checksums.txt
           draft: false
           prerelease: false
