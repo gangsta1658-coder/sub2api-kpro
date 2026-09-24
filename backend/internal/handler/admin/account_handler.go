@@ -2844,6 +2844,11 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 		return
 	}
 
+	if ids := service.ConfiguredTestModelIDs(account); len(ids) > 0 {
+		response.Success(c, service.TestPickerModels(ids))
+		return
+	}
+
 	// Handle OpenAI accounts
 	if account.IsOpenAI() {
 		// Prefer the shared, account-keyed upstream catalog. If discovery fails,

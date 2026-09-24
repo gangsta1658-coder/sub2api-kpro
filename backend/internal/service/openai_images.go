@@ -467,7 +467,9 @@ func applyOpenAIImagesDefaults(req *OpenAIImagesRequest) {
 }
 
 func isOpenAIImageGenerationModel(model string) bool {
-	return IsGPTImageGenerationModel(model) || isGrokImageGenerationModel(model)
+	model = strings.ToLower(strings.TrimSpace(model))
+	return IsGPTImageGenerationModel(model) || isGrokImageGenerationModel(model) ||
+		strings.HasPrefix(model, "agnes-image-")
 }
 
 // IsGPTImageGenerationModel identifies the GPT native image-generation model family.
