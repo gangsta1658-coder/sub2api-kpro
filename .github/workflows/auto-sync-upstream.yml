@@ -56,8 +56,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add upstream https://github.com/Wei-Shaw/sub2api.git || true
-          git fetch upstream "${{ steps.check_version.outputs.new_tag }}"
-          git merge "${{ steps.check_version.outputs.new_tag }}" -m "chore: auto-merge upstream ${{ steps.check_version.outputs.new_tag }} while preserving Kpro features" --no-edit || {
+          git fetch upstream tag "${{ steps.check_version.outputs.new_tag }}"
+          git merge FETCH_HEAD -m "chore: auto-merge upstream ${{ steps.check_version.outputs.new_tag }} while preserving Kpro features" --no-edit || {
             echo "Auto-merge encountered conflicts. Please resolve manually."
             exit 1
           }
