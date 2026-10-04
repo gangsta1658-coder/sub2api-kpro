@@ -50,22 +50,81 @@ jobs:
             echo "new_name=$UPSTREAM_NAME" >> $GITHUB_OUTPUT
           fi
 
-      - name: Merge Upstream Changes
+      - name: Merge Upstream Changes (Kpro-aware 3-way sync)
         if: steps.check_version.outputs.has_update == 'true'
         run: |
+          set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add upstream https://github.com/Wei-Shaw/sub2api.git || true
-          git fetch upstream tag "${{ steps.check_version.outputs.new_tag }}"
-          git merge FETCH_HEAD -m "chore: auto-merge upstream ${{ steps.check_version.outputs.new_tag }} while preserving Kpro features" --no-edit || {
-            echo "Auto-merge encountered conflicts. Please resolve manually."
+          NEW_TAG="${{ steps.check_version.outputs.new_tag }}"
+          git fetch --no-tags upstream tag "$NEW_TAG"
+          if [ ! -f .upstream-sync ]; then
+            echo "::error::.upstream-sync marker missing; cannot determine last-synced upstream tag."
             exit 1
-          }
-          RAW_VERSION="${{ steps.check_version.outputs.new_tag }}"; VERSION="${RAW_VERSION#v}"
+          fi
+          OLD_TAG=$(tr -d ' \n\r' < .upstream-sync)
+          git fetch --no-tags upstream tag "$OLD_TAG"
+          echo "Syncing: last-synced=$OLD_TAG -> new=$NEW_TAG"
+          if [ "$OLD_TAG" = "$NEW_TAG" ]; then
+            echo "Tree already synced to $NEW_TAG; skipping rebuild."
+          else
+            git diff --name-status "$OLD_TAG" HEAD -- . ':!.upstream-sync' > /tmp/kpro_files.txt || true
+            wc -l /tmp/kpro_files.txt
+            git read-tree --reset -u "$NEW_TAG^{}"
+            : > /tmp/conflicts.txt
+            mkdir -p /tmp/mf
+            while IFS="$(printf '\t')" read -r st p1 p2; do
+              [ -z "$st" ] && continue
+              case "$st" in
+                R*)
+                  git rm -q --cached "$p1" 2>/dev/null || true; rm -f "$p1"
+                  mkdir -p "$(dirname "$p2")"
+                  git show "HEAD:$p2" > "$p2"
+                  git add "$p2"
+                  ;;
+                A*)
+                  mkdir -p "$(dirname "$p1")"
+                  git show "HEAD:$p1" > "$p1"
+                  git add "$p1"
+                  ;;
+                D*)
+                  git rm -q "$p1" 2>/dev/null || true
+                  ;;
+                *)
+                  if git cat-file -e "$NEW_TAG:$p1" 2>/dev/null; then
+                    git show "$OLD_TAG:$p1" > /tmp/mf/base 2>/dev/null || : > /tmp/mf/base
+                    git show "HEAD:$p1" > /tmp/mf/ours
+                    git show "$NEW_TAG:$p1" > /tmp/mf/theirs
+                    if git merge-file -L ours -L base -L theirs /tmp/mf/ours /tmp/mf/base /tmp/mf/theirs; then
+                      cp /tmp/mf/ours "$p1"
+                    else
+                      cp /tmp/mf/ours "$p1"
+                      echo "$p1" >> /tmp/conflicts.txt
+                    fi
+                  else
+                    echo "$p1 (deleted upstream, modified by Kpro)" >> /tmp/conflicts.txt
+                  fi
+                  ;;
+              esac
+            done < /tmp/kpro_files.txt
+            if [ -s /tmp/conflicts.txt ]; then
+              echo "::error::Genuine conflicts need manual resolution:"
+              cat /tmp/conflicts.txt
+              exit 1
+            fi
+            git add -A
+          fi
+          RAW_VERSION="$NEW_TAG"; VERSION="${RAW_VERSION#v}"
           echo -n "$VERSION" > backend/cmd/server/VERSION
-          git add backend/cmd/server/VERSION
-          git commit --amend --no-edit || true
-          git push origin HEAD:main
+          echo "$NEW_TAG" > .upstream-sync
+          git add backend/cmd/server/VERSION .upstream-sync
+          if git diff --cached --quiet; then
+            echo "Nothing to commit; tree already up to date."
+          else
+            git commit -m "chore: auto-sync upstream $NEW_TAG while preserving Kpro features" --no-edit
+            git push origin HEAD:main
+          fi
 
       - name: Setup Node.js
         if: steps.check_version.outputs.has_update == 'true'
