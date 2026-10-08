@@ -58,13 +58,13 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add upstream https://github.com/Wei-Shaw/sub2api.git || true
           NEW_TAG="${{ steps.check_version.outputs.new_tag }}"
-          git fetch --no-tags upstream tag "$NEW_TAG"
+          git fetch --force --no-tags upstream tag "$NEW_TAG"
           if [ ! -f .upstream-sync ]; then
             echo "::error::.upstream-sync marker missing; cannot determine last-synced upstream tag."
             exit 1
           fi
           OLD_TAG=$(tr -d ' \n\r' < .upstream-sync)
-          git fetch --no-tags upstream tag "$OLD_TAG"
+          git fetch --force --no-tags upstream tag "$OLD_TAG"
           echo "Syncing: last-synced=$OLD_TAG -> new=$NEW_TAG"
           if [ "$OLD_TAG" = "$NEW_TAG" ]; then
             echo "Tree already synced to $NEW_TAG; skipping rebuild."
