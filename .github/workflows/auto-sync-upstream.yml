@@ -69,7 +69,7 @@ jobs:
           if [ "$OLD_TAG" = "$NEW_TAG" ]; then
             echo "Tree already synced to $NEW_TAG; skipping rebuild."
           else
-            git diff --name-status "$OLD_TAG" HEAD -- . ':!.upstream-sync' > /tmp/kpro_files.txt || true
+            git diff --name-status "$OLD_TAG" HEAD -- . ':!.upstream-sync' ':!backend/cmd/server/VERSION' > /tmp/kpro_files.txt || true
             wc -l /tmp/kpro_files.txt
             git read-tree --reset -u "$NEW_TAG^{}"
             : > /tmp/conflicts.txt
